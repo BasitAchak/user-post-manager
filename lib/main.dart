@@ -10,7 +10,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'User and Post Manager',
       home: UserPostManager(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -33,8 +35,10 @@ class _UserPostManagerState extends State<UserPostManager> {
     fetchUsers();
   }
 
+  // ✅ 1. FETCH USERS
   Future<void> fetchUsers() async {
-    final response = await http.get(Uri.parse('https://jsonplaceholder.typicode.com/users'));
+    final response =
+        await http.get(Uri.parse('https://jsonplaceholder.typicode.com/users'));
     if (response.statusCode == 200) {
       setState(() {
         users = json.decode(response.body);
@@ -44,117 +48,136 @@ class _UserPostManagerState extends State<UserPostManager> {
     }
   }
 
-  Future<void> createPost() async {
-    final response = await http.post(
-      Uri.parse('https://jsonplaceholder.typicode.com/posts'),
-      headers: {'Content-Type': 'application/json; charset=UTF-8'},
-      body: json.encode({
-        'title': _titleController.text,
-        'body': _bodyController.text,
-        'userId': users.isNotEmpty ? users[0]['id'] : 1,
-      }),
-    );
-    if (response.statusCode == 201) {
-      final newPost = json.decode(response.body);
-      setState(() {
-        posts.add(newPost);
-        _titleController.clear();
-        _bodyController.clear();
-      });
-    } else {
-      throw Exception('Failed to create post');
-    }
+  // ✅ 2. CREATE POST (local only)
+  void createPost() {
+    if (_titleController.text.isEmpty || _bodyController.text.isEmpty) return;
+
+    final newPost = {
+      'id': DateTime.now().millisecondsSinceEpoch,
+      'title': _titleController.text,
+      'body': _bodyController.text,
+      'userId': users.isNotEmpty ? users[0]['id'] : 1,
+    };
+
+    setState(() {
+      posts.add(newPost);
+      _titleController.clear();
+      _bodyController.clear();
+    });
   }
 
-  Future<void> updatePost(int index) async {
-    final post = posts[index];
-    final response = await http.put(
-      Uri.parse('https://jsonplaceholder.typicode.com/posts/${post['id']}'),
-      headers: {'Content-Type': 'application/json; charset=UTF-8'},
-      body: json.encode({
-        'id': post['id'],
-        'title': _titleController.text,
-        'body': _bodyController.text,
-        'userId': post['userId'],
-      }),
-    );
-    if (response.statusCode == 200) {
-      setState(() {
-        posts[index] = json.decode(response.body);
-        _editingIndex = null;
-        _titleController.clear();
-        _bodyController.clear();
-      });
-    } else {
-      throw Exception('Failed to update post');
-    }
+  // ✅ 3. UPDATE POST (local only)
+  void updatePost(int index) {
+    setState(() {
+      posts[index]['title'] = _titleController.text;
+      posts[index]['body'] = _bodyController.text;
+      _editingIndex = null;
+      _titleController.clear();
+      _bodyController.clear();
+    });
   }
 
-  Future<void> deletePost(int index) async {
-    final post = posts[index];
-    final response = await http.delete(
-      Uri.parse('https://jsonplaceholder.typicode.com/posts/${post['id']}'),
-    );
-    if (response.statusCode == 200) {
-      setState(() {
-        posts.removeAt(index);
-      });
-    } else {
-      throw Exception('Failed to delete post');
-    }
+  // ✅ 4. DELETE POST (local only)
+  void deletePost(int index) {
+    setState(() {
+      posts.removeAt(index);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('User Post Manager')),
+      appBar: AppBar(title: Text('User and Post Manager')),
       body: Padding(
         padding: EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // ✅ User List Display
+            Text('Users from JSONPlaceholder:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 6),
+            users.isEmpty
+                ? Text('Loading users...')
+                : SizedBox(
+                    height: 80,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          margin: EdgeInsets.symmetric(horizontal: 6),
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.blue),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(users[index]['name'], style: TextStyle(fontSize: 12)),
+                              Text(users[index]['email'], style: TextStyle(fontSize: 10)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+            SizedBox(height: 20),
+
+            // ✅ Form for Title and Body
             TextField(
               controller: _titleController,
-              decoration: InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(labelText: 'Post Title'),
             ),
             TextField(
               controller: _bodyController,
-              decoration: InputDecoration(labelText: 'Body'),
+              decoration: InputDecoration(labelText: 'Post Body'),
             ),
             SizedBox(height: 10),
             ElevatedButton(
-              onPressed: _editingIndex == null ? createPost : () => updatePost(_editingIndex!),
+              onPressed: _editingIndex == null
+                  ? createPost
+                  : () => updatePost(_editingIndex!),
               child: Text(_editingIndex == null ? 'Create Post' : 'Update Post'),
             ),
+
             SizedBox(height: 20),
+
+            // ✅ List of Created Posts
             Expanded(
-              child: ListView.builder(
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(posts[index]['title']),
-                    subtitle: Text(posts[index]['body']),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit),
-                          onPressed: () {
-                            setState(() {
-                              _editingIndex = index;
-                              _titleController.text = posts[index]['title'];
-                              _bodyController.text = posts[index]['body'];
-                            });
-                          },
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => deletePost(index),
-                        ),
-                      ],
+              child: posts.isEmpty
+                  ? Center(child: Text('No posts created yet.'))
+                  : ListView.builder(
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        return Card(
+                          margin: EdgeInsets.symmetric(vertical: 5),
+                          child: ListTile(
+                            title: Text(posts[index]['title']),
+                            subtitle: Text(posts[index]['body']),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit, color: Colors.orange),
+                                  onPressed: () {
+                                    setState(() {
+                                      _editingIndex = index;
+                                      _titleController.text = posts[index]['title'];
+                                      _bodyController.text = posts[index]['body'];
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => deletePost(index),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         ),
